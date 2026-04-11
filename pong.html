@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CYBER-PONG – Advanced System</title>
+  <title>CYBER-PONG – Two Player (To 25)</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@
       min-height: 100vh;
       font-family: var(--ui-font);
       color: var(--score-color);
-      overflow: hidden; /* Prevents scrollbars during screen shake */
+      overflow: hidden;
     }
 
     h1 { 
@@ -46,6 +46,7 @@
       margin-bottom: 15px; 
       color: var(--score-color);
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 0 20px var(--ball-color);
+      text-transform: uppercase;
     }
 
     #controls {
@@ -78,9 +79,7 @@
       background: var(--court-color);
       border: 2px solid var(--net-color);
       border-radius: 8px;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.😎, 0 0 15px rgba(0, 240, 255, 0.15);
-      /* Smooth transition for when we aren't shaking */
-      transition: transform 0.05s ease-out; 
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 240, 255, 0.15);
     }
 
     #message {
@@ -101,7 +100,7 @@
 </head>
 <body>
 
-  <h1>SYS.PONG_v2</h1>
+  <h1>SYS.PONG_</h1>
 
   <div id="controls">
     PLAYER 1 <span class="p1-key">[W / S]</span> &nbsp;|&nbsp; PLAYER 2 <span class="p2-key">[↑ / ↓]</span>
@@ -113,62 +112,21 @@
   <div id="message">AWAITING INPUT...</div>
 
   <script>
-    /* ─────────────────────────────────────────
-       AUDIO SYNTHESIZER (Web Audio API)
-    ─────────────────────────────────────────── */
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
-
-    function playSound(type) {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      
-      const osc = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      osc.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      const now = audioCtx.currentTime;
-
-      if (type === 'hit') {
-        // High pitched tech blip
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
-        gainNode.gain.setValueAtTime(0.1, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        osc.start(now);
-        osc.stop(now + 0.1);
-      } else if (type === 'score') {
-        // Low pitched error/score sound
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
-        gainNode.gain.setValueAtTime(0.15, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-        osc.start(now);
-        osc.stop(now + 0.3);
-      }
-    }
-
-    /* ─────────────────────────────────────────
-       SETTINGS & SETUP
-    ─────────────────────────────────────────── */
     const SETTINGS = {
       canvas: { width: 800, height: 500 },
       ball: {
         radius: 8,
         startSpeed: 6,
         speedIncrease: 0.5,
-        maxSpeed: 18,
+        maxSpeed: 16,
       },
       paddle: {
-        width: 12,
+        width: 14,
         height: 90,
-        speed: 8,
+        speed: 7,
         margin: 18,
       },
-      winScore: 7,
+      winScore: 25, // <--- CHANGED TO 25
     };
 
     const canvas = document.getElementById('gameCanvas');
@@ -178,122 +136,102 @@
     canvas.width = SETTINGS.canvas.width;
     canvas.height = SETTINGS.canvas.height;
 
-    // Read CSS variables for JS rendering
-    function cssVar(name) {
-      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    }
-
+    // Game State
     const state = {
       running: false,
       paused: false,
       gameOver: false,
       scores: { p1: 0, p2: 0 },
-      shakeTime: 0, // Used for screen shake
+      rally: 0,
+      screenShake: 0
     };
 
-    /* ─────────────────────────────────────────
-       PARTICLE SYSTEM
-    ─────────────────────────────────────────── */
+    // Visual Arrays
     let particles = [];
+    let ballTrail = [];
 
-    function createParticles(x, y, color, direction) {
-      for (let i = 0; i < 15; i++) {
-        particles.push({
-          x: x,
-          y: y,
-          vx: (Math.random() * 4 + 2) * direction,
-          vy: (Math.random() - 0.5) * 6,
-          life: 1.0, // Fades from 1 to 0
-          color: color,
-          size: Math.random() * 4 + 2
-        });
-      }
-    }
-
-    function updateAndDrawParticles() {
-      for (let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.03; // Particle decay rate
-
-        if (p.life <= 0) {
-          particles.splice(i, 1);
-        } else {
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.life;
-          ctx.fillRect(p.x, p.y, p.size, p.size);
-          ctx.globalAlpha = 1.0;
-        }
-      }
-    }
-
-    /* ─────────────────────────────────────────
-       GAME ENTITIES
-    ─────────────────────────────────────────── */
     const ball = {
       x: canvas.width / 2,
       y: canvas.height / 2,
-      vx: SETTINGS.ball.startSpeed,
-      vy: SETTINGS.ball.startSpeed,
+      vx: 0,
+      vy: 0,
       r: SETTINGS.ball.radius,
-      trail: [], // Stores previous positions for neon blur
 
       reset(serveLeft = true) {
         this.x = canvas.width / 2;
         this.y = canvas.height / 2;
-        this.trail = [];
         const angle = (Math.random() * 40 - 20) * (Math.PI / 180);
         const speed = SETTINGS.ball.startSpeed;
         this.vx = (serveLeft ? -1 : 1) * speed * Math.cos(angle);
         this.vy = speed * Math.sin(angle);
+        ballTrail = [];
+        state.rally = 0;
       },
     };
 
     const p1 = {
-      w: SETTINGS.paddle.width, h: SETTINGS.paddle.height, dy: 0,
+      w: SETTINGS.paddle.width,
+      h: SETTINGS.paddle.height,
+      dy: 0,
       x: SETTINGS.paddle.margin,
       y: canvas.height / 2 - SETTINGS.paddle.height / 2,
-      color: cssVar('--paddle-p1-color')
+      color: getComputedStyle(document.documentElement).getPropertyValue('--paddle-p1-color').trim()
     };
 
     const p2 = {
-      w: SETTINGS.paddle.width, h: SETTINGS.paddle.height, dy: 0,
+      w: SETTINGS.paddle.width,
+      h: SETTINGS.paddle.height,
+      dy: 0,
       x: canvas.width - SETTINGS.paddle.margin - SETTINGS.paddle.width,
       y: canvas.height / 2 - SETTINGS.paddle.height / 2,
-      color: cssVar('--paddle-p2-color')
+      color: getComputedStyle(document.documentElement).getPropertyValue('--paddle-p2-color').trim()
     };
 
-    /* ─────────────────────────────────────────
-       INPUT & CONTROLS
-    ─────────────────────────────────────────── */
     const keys = {};
 
     document.addEventListener('keydown', e => {
       keys[e.key] = true;
       if (e.key === ' ') {
         e.preventDefault();
-        
-        // Initialize Audio context securely on first user interaction
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-
-        if (state.gameOver) {
-          resetGame();
-        } else if (!state.running) {
-          startGame();
-        } else {
-          togglePause();
-        }
+        if (state.gameOver) resetGame();
+        else if (!state.running) startGame();
+        else togglePause();
       }
     });
 
     document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
 
-    /* ─────────────────────────────────────────
-       PHYSICS & LOGIC
-    ─────────────────────────────────────────── */
+    function createParticles(x, y, color, direction) {
+      for (let i = 0; i < 15; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: direction * (Math.random() * 4 + 2),
+          vy: (Math.random() - 0.5) * 6,
+          life: 1,
+          color: color
+        });
+      }
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.03;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function triggerShake() {
+      state.screenShake = 10;
+    }
+
     function movePaddles() {
       if (keys['w'] || keys['W']) p1.dy = -SETTINGS.paddle.speed;
       else if (keys['s'] || keys['S']) p1.dy = SETTINGS.paddle.speed;
@@ -308,51 +246,53 @@
     }
 
     function moveBall() {
-      // Store trail history
-      ball.trail.push({ x: ball.x, y: ball.y });
-      if (ball.trail.length > 😎 ball.trail.shift();
+      ballTrail.push({ x: ball.x, y: ball.y });
+      if (ballTrail.length > 8) ballTrail.shift();
 
-      ball.x += ball.vx;
-      ball.y += ball.vy;
+      let nextX = ball.x + ball.vx;
+      let nextY = ball.y + ball.vy;
 
-      // Wall bounce
-      if (ball.y - ball.r <= 0) {
-        ball.y = ball.r;
+      if (nextY - ball.r <= 0) {
+        nextY = ball.r;
         ball.vy = Math.abs(ball.vy);
-        playSound('hit');
-      }
-      if (ball.y + ball.r >= canvas.height) {
-        ball.y = canvas.height - ball.r;
+        triggerShake();
+      } else if (nextY + ball.r >= canvas.height) {
+        nextY = canvas.height - ball.r;
         ball.vy = -Math.abs(ball.vy);
-        playSound('hit');
+        triggerShake();
       }
 
-      // Player 1 Collision
-      if (ball.x - ball.r <= p1.x + p1.w && ball.x + ball.r >= p1.x && ball.y >= p1.y && ball.y <= p1.y + p1.h) {
-        ball.x = p1.x + p1.w + ball.r;
-        bounceBallOff(p1, 1);
+      if (ball.vx < 0 && ball.x - ball.r >= p1.x + p1.w && nextX - ball.r <= p1.x + p1.w) {
+        let intersectY = ball.y - ((ball.x - (p1.x + p1.w)) * (ball.vy / ball.vx));
+        if (intersectY >= p1.y - ball.r && intersectY <= p1.y + p1.h + ball.r) {
+          nextX = p1.x + p1.w + ball.r;
+          bounceBallOff(p1, 1);
+          createParticles(nextX, intersectY, p1.color, 1);
+          triggerShake();
+        }
       }
 
-      // Player 2 Collision
-      if (ball.x + ball.r >= p2.x && ball.x - ball.r <= p2.x + p2.w && ball.y >= p2.y && ball.y <= p2.y + p2.h) {
-        ball.x = p2.x - ball.r;
-        bounceBallOff(p2, -1);
+      if (ball.vx > 0 && ball.x + ball.r <= p2.x && nextX + ball.r >= p2.x) {
+        let intersectY = ball.y + ((p2.x - ball.x) * (ball.vy / ball.vx));
+        if (intersectY >= p2.y - ball.r && intersectY <= p2.y + p2.h + ball.r) {
+          nextX = p2.x - ball.r;
+          bounceBallOff(p2, -1);
+          createParticles(nextX, intersectY, p2.color, -1);
+          triggerShake();
+        }
       }
 
-      // Scoring
-      if (ball.x - ball.r < 0) score('p2');
-      if (ball.x + ball.r > canvas.width) score('p1');
+      ball.x = nextX;
+      ball.y = nextY;
+
+      if (ball.x + ball.r < 0) score('p2');
+      else if (ball.x - ball.r > canvas.width) score('p1');
     }
 
     function bounceBallOff(paddle, dir) {
-      playSound('hit');
-      createParticles(ball.x, ball.y, paddle.color, dir);
-      
+      state.rally++;
       const hitPos = (ball.y - (paddle.y + paddle.h / 2)) / (paddle.h / 2);
-      
-      // Dynamic angle calculation + paddle movement slice
-      const sliceEffect = (paddle.dy / SETTINGS.paddle.speed) * 0.2; 
-      const bounceAngle = (hitPos * (Math.PI / 4)) + sliceEffect;
+      const bounceAngle = hitPos * (Math.PI / 4); 
 
       const currentSpeed = Math.min(
         Math.hypot(ball.vx, ball.vy) + SETTINGS.ball.speedIncrease,
@@ -364,13 +304,9 @@
     }
 
     function score(player) {
-      playSound('score');
       state.scores[player]++;
-      state.shakeTime = 15; // Trigger screen shake
+      triggerShake();
       
-      // Explosion particles in center of screen
-      createParticles(canvas.width/2, canvas.height/2, cssVar('--ball-color'), Math.random() > 0.5 ? 1 : -1);
-
       if (state.scores[player] >= SETTINGS.winScore) {
         endGame(player);
       } else {
@@ -379,31 +315,20 @@
       }
     }
 
-    /* ─────────────────────────────────────────
-       RENDERING
-    ─────────────────────────────────────────── */
-    function applyScreenShake() {
-      if (state.shakeTime > 0) {
-        const magnitude = (state.shakeTime / 15) * 8; // intensity decreases
-        const dx = (Math.random() - 0.5) * magnitude;
-        const dy = (Math.random() - 0.5) * magnitude;
-        canvas.style.transform = translate(${dx}px, ${dy}px);
-        state.shakeTime--;
-      } else {
-        canvas.style.transform = translate(0, 0);
-      }
-    }
-
     function draw() {
-      applyScreenShake();
+      ctx.save();
+      if (state.screenShake > 0) {
+        const dx = (Math.random() - 0.5) * 10;
+        const dy = (Math.random() - 0.5) * 10;
+        ctx.translate(dx, dy);
+        state.screenShake--;
+      }
 
-      // Clear canvas with slight transparency for a fading effect
-      ctx.fillStyle = cssVar('--court-color');
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw Net
+      // Center net
       ctx.setLineDash([10, 14]);
-      ctx.strokeStyle = cssVar('--net-color');
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--net-color').trim();
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(canvas.width / 2, 0);
@@ -411,66 +336,100 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Draw Scores
-      ctx.fillStyle = cssVar('--score-color');
-      ctx.font = 'bold 64px ' + cssVar('--ui-font');
-      ctx.textAlign = 'center';
-      ctx.fillText(state.scores.p1, canvas.width / 4, 80);
-      ctx.fillText(state.scores.p2, canvas.width * 3 / 4, 80);
-
-      // Draw Particles
-      updateAndDrawParticles();
-
-      // Draw Paddles
-      ctx.shadowBlur = 10;
+      // --- UPGRADED TYPOGRAPHY & SCORES ---
       
-      ctx.shadowColor = p1.color;
+      // Scores (Bigger, brighter, with glow)
+      ctx.shadowColor = getComputedStyle(document.documentElement).getPropertyValue('--score-color').trim();
+      ctx.shadowBlur = 10; // Gives it a neon glow
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--score-color').trim();
+      ctx.font = 'bold 64px var(--ui-font)'; // Increased from 48px
+      ctx.textAlign = 'center';
+      ctx.fillText(state.scores.p1, canvas.width / 4, 75);
+      ctx.fillText(state.scores.p2, canvas.width * 3 / 4, 75);
+      ctx.shadowBlur = 0; // Reset shadow so it doesn't bleed
+
+      // Player labels (Color-coded, opaque, and highly readable)
+      ctx.font = 'bold 22px var(--ui-font)';
+      
+      ctx.fillStyle = p1.color; // Match Pink Paddle
+      ctx.fillText('PLAYER 1', canvas.width / 4, 110);
+      
+      ctx.fillStyle = p2.color; // Match Yellow Paddle
+      ctx.fillText('PLAYER 2', canvas.width * 3 / 4, 110);
+      
+      // Rally Counter 
+      if (state.rally > 2) {
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
+        ctx.font = 'bold 20px var(--ui-font)';
+        ctx.fillText(`RALLY: ${state.rally}`, canvas.width / 2, 40);
+      }
+      
+      // ------------------------------------
+
+      // Paddles
       ctx.fillStyle = p1.color;
-      ctx.fillRect(p1.x, p1.y, p1.w, p1.h);
+      ctx.beginPath();
+      ctx.roundRect(p1.x, p1.y, p1.w, p1.h, 4);
+      ctx.fill();
 
-      ctx.shadowColor = p2.color;
       ctx.fillStyle = p2.color;
-      ctx.fillRect(p2.x, p2.y, p2.w, p2.h);
+      ctx.beginPath();
+      ctx.roundRect(p2.x, p2.y, p2.w, p2.h, 4);
+      ctx.fill();
 
-      // Draw Ball Trail
-      ctx.shadowBlur = 0; // reset shadow for trail
-      for (let i = 0; i < ball.trail.length; i++) {
-        const pos = ball.trail[i];
-        const alpha = (i / ball.trail.length) * 0.5; // fades out
-        ctx.fillStyle = rgba(0, 240, 255, ${alpha});
+      // Ball Trail
+      for (let i = 0; i < ballTrail.length; i++) {
+        const point = ballTrail[i];
+        const alpha = (i + 1) / ballTrail.length;
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ball.r * (i / ball.trail.length), 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, ball.r * alpha, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
-      // Draw Ball
-      ctx.shadowColor = cssVar('--ball-color');
+      // Ball
+      ctx.shadowColor = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
       ctx.shadowBlur = 15;
-      ctx.fillStyle = cssVar('--ball-color');
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Pause Overlay
+      // Particles
+      particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      // Pause overlay
       if (state.paused) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = cssVar('--score-color');
-        ctx.font = 'bold 36px ' + cssVar('--ui-font');
+        ctx.fillRect(-20, -20, canvas.width + 40, canvas.height + 40);
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--score-color').trim();
+        ctx.font = 'bold 36px var(--ui-font)';
         ctx.fillText('SYSTEM PAUSED', canvas.width / 2, canvas.height / 2);
+        ctx.font = '16px var(--ui-font)';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
+        ctx.fillText('Press SPACE to resume', canvas.width / 2, canvas.height / 2 + 40);
       }
+
+      ctx.restore();
     }
 
-    /* ─────────────────────────────────────────
-       GAME LOOP & STATES
-    ─────────────────────────────────────────── */
     let animId = null;
 
     function loop() {
       if (!state.paused) {
         movePaddles();
         moveBall();
+        updateParticles();
       }
       draw();
       animId = requestAnimationFrame(loop);
@@ -480,15 +439,14 @@
       state.running = true;
       state.paused = false;
       state.gameOver = false;
-      message.textContent = 'SYSTEM ACTIVE';
-      message.style.animation = 'none'; // Stop flashing
+      message.textContent = '';
       ball.reset(Math.random() < 0.5);
       loop();
     }
 
     function togglePause() {
       state.paused = !state.paused;
-      message.textContent = state.paused ? 'AWAITING INPUT...' : 'SYSTEM ACTIVE';
+      message.textContent = state.paused ? '' : '';
     }
 
     function endGame(winner) {
@@ -496,9 +454,9 @@
       state.gameOver = true;
       cancelAnimationFrame(animId);
       draw();
+
       const label = winner === 'p1' ? 'PLAYER 1' : 'PLAYER 2';
-      message.style.animation = 'pulse 1.5s infinite alternate';
-      message.textContent = 🏆 ${label} TAKES THE MATCH! Press SPACE to restart.;
+      message.textContent = `🏆 ${label} TAKES THE MATCH! Press SPACE to restart.`;
     }
 
     function resetGame() {
@@ -506,9 +464,11 @@
       state.scores = { p1: 0, p2: 0 };
       state.gameOver = false;
       state.paused = false;
+      state.rally = 0;
       particles = [];
       resetPaddles();
       ball.reset(true);
+      message.textContent = '';
       startGame();
     }
 
@@ -519,7 +479,6 @@
       p2.dy = 0;
     }
 
-    // Initial render
     resetPaddles();
     ball.reset(true);
     draw();
