@@ -1,27 +1,27 @@
-# Dev-Collab 🚀
+# Dev-Collab
 
 A test repository for collaboration and teamwork.
 
-## 📌 Overview
+##  Overview
 This repository is created for our course subject and section **WebSystems-9318-AY225** to practice and demonstrate collaborative development using Git and GitHub. It serves as a sandbox for students to contribute, experiment, and learn version control workflows as a team.
 
-## 👥 Contributors
+##  Contributors
 - Sam Janell Jalipa (Saemeow)
 - Jhane Rose Sadicon (jhanerose)
 
-## 🛠️ Purpose
+##  Purpose
 - Practice Git workflows (clone, commit, push, pull, merge)
 - Learn how to resolve conflicts
 - Collaborate on shared code/projects
 
-## 📂 Project Structure
+##  Project Structure
 ```
 / (root)
 │── README.md     # Document
 │── index.html    # Main landing page
 
 ````
-## 🚀 Getting Started
+##  Getting Started
 
 ### 1. Clone the repository
 ```bash
@@ -53,15 +53,15 @@ git commit -m "Add: your message here"
 git push origin feature-yourname
 ```
 
-### 6. Open a Pull Request 🚀
+### 6. Open a Pull Request 
 
-## 📖 Rules / Guidelines
+##  Rules / Guidelines
 
 * Always create a new branch for changes
 * Write clear commit messages
 * Pull before pushing to avoid conflicts
 * Respect other contributors’ code
 
-## 🎯 Goal
+##  Goal
 
 To build teamwork skills and improve collaboration in development projects.
